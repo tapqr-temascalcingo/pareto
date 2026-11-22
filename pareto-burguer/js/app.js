@@ -13,11 +13,15 @@
     unidad: { singular: 'caso', plural: 'casos' },
     campoCausa: 'causas',                       // lista; la 1.ª opción = causa principal
     excluir: ['No experimenté ningún problema'],// respuestas que NO entran al Pareto
+    // Opciones de la encuesta que siempre se muestran, aunque nadie las elija (frecuencia 0).
+    // Para agregar otra, basta con escribir su nombre exacto en esta lista.
+    causasFijas: ['Cobros incorrectos en la cuenta'],
     meta: 80,
     nombresCortos: {
       'Demora en la entrega de alimentos o bebidas': 'Demora en la entrega',
       'Errores en los pedidos entregados': 'Errores en pedidos',
       'Falta de atención por parte del personal': 'Falta de atención',
+      'Cobros incorrectos en la cuenta': 'Cobros incorrectos',
       'Cobros incorrectos en la cuenta': 'Cobros incorrectos',
     },
     // Filtros (uno por columna de categoría importante)
@@ -109,6 +113,8 @@
     }
     const total = casos.length;
     const conteo = new Map();
+    // Causas fijas en 0 ANTES de contar: aparecen siempre, aunque nadie las elija o haya filtros
+    CONFIG.causasFijas.filter((c) => !CONFIG.excluir.includes(c)).forEach((c) => conteo.set(c, 0));
     casos.forEach((c) => conteo.set(c.principal, (conteo.get(c.principal) || 0) + 1));
 
     let acum = 0;
@@ -117,7 +123,8 @@
       acum += n;
       const acumPct = pct(acum, total);
       // Vital: todas las causas hasta la primera que alcanza o pasa la meta (inclusive)
-      const vital = !vitalCerrado;
+      // (una causa con 0 casos nunca es vital)
+      const vital = !vitalCerrado && n > 0;
       if (acumPct >= CONFIG.meta - 1e-9) vitalCerrado = true;
       return { rango: i + 1, causa, corto: corto(causa), n, pct: pct(n, total), acum, acumPct, vital };
     });
@@ -254,6 +261,7 @@
     <div class="fila"><span>% del total</span><span>${fmt1(f.pct)}%</span></div>
     <div class="fila"><span>% acumulado</span><span>${fmt1(f.acumPct)}%</span></div>
     <div class="fila"><span>Tipo</span><span>${f.vital ? 'Vital' : 'Trivial'}</span></div>
+    ${f.n === 0 ? '<div style="margin-top:.3rem">Nadie la eligió como problema principal</div>' : ''}
     <div style="opacity:.7;margin-top:.3rem">Clic para ver el detalle</div>`;
 
   function pasoBonito(max, objetivo = 5) {
@@ -328,7 +336,10 @@
       // Barra con esquinas superiores redondeadas, anclada a la base
       const d = `M${x},${m.t + ph} V${yTop + r} Q${x},${yTop} ${x + r},${yTop} H${x + anchoBarra - r} Q${x + anchoBarra},${yTop} ${x + anchoBarra},${yTop + r} V${m.t + ph} Z`;
       let forma;
-      if (f.vital) {
+      if (f.n === 0) {
+        // Frecuencia 0: línea fina en la base con su color pastel, para que se note que existe
+        forma = `<rect class="forma" x="${x}" y="${m.t + ph - 4}" width="${anchoBarra}" height="4" rx="2" fill="${col.c}" fill-opacity=".45" stroke="${col.c}" stroke-width="1"/>`;
+      } else if (f.vital) {
         // Vital: degradado vertical (claro arriba, intenso abajo) + sombra suave del mismo color
         defs.push(`<linearGradient id="gB${i}" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stop-color="${col.claro}"/><stop offset=".55" stop-color="${col.c}"/><stop offset="1" stop-color="${col.medio}"/></linearGradient>
@@ -341,7 +352,9 @@
       }
       // Números: blanco sobre píldora del tono oscuro (AA) en vitales; tinta oscura en pastel o fuera de la barra
       let etiquetas;
-      if (adentro && f.vital) {
+      if (f.n === 0) {
+        etiquetas = `<text x="${cx(i)}" y="${m.t + ph - fs(12)}" text-anchor="middle" font-size="${fs(13)}" font-weight="700" fill="#334155">0 · ${fmt1(0)}%</text>`;
+      } else if (adentro && f.vital) {
         const tN = String(f.n), tP = fmt1(f.pct) + '%';
         const pillW = Math.min(Math.max(tN.length * fs(18) * 0.64, tP.length * fs(13) * 0.6) + fs(18), Math.max(anchoBarra - 8, fs(52)));
         etiquetas = `<rect x="${cx(i) - pillW / 2}" y="${yTop + fs(6)}" width="${pillW}" height="${fs(45)}" rx="${fs(10)}" fill="${col.oscuro}"/>
@@ -379,9 +392,16 @@
         <polyline class="linea-halo" points="${ptsTxt}" fill="none" stroke="#ffffff" stroke-opacity=".9" stroke-width="7" stroke-linejoin="round" stroke-linecap="round" ${trazo}/>
         <polyline class="linea" points="${ptsTxt}" fill="none" stroke="url(#gLinea)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" ${trazo}/>
       </g>`;
-    const marcas = p.filas.map((f, i) => `
+    const marcas = p.filas.map((f, i) => {
+      // Si la etiqueta no cabe a la derecha del punto (choca con el eje), va centrada debajo
+      const txt = fmt1(f.acumPct) + '%';
+      const noCabe = puntos[i][0] + fs(9) + txt.length * fs(12.5) * 0.6 > m.l + pw;
+      const lx = noCabe ? puntos[i][0] : puntos[i][0] + fs(9);
+      const ly = noCabe ? puntos[i][1] + fs(22) : puntos[i][1] - fs(9);
+      return `
       <circle cx="${puntos[i][0]}" cy="${puntos[i][1]}" r="${fs(6)}" fill="#ffffff" stroke="url(#gLinea)" stroke-width="2.5" class="pto" data-i="${i}"/>
-      <text x="${puntos[i][0] + fs(9)}" y="${puntos[i][1] - fs(9)}" font-size="${fs(12.5)}" font-weight="700" fill="#1E3A8A" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke">${fmt1(f.acumPct)}%</text>`).join('');
+      <text x="${lx}" y="${ly}" text-anchor="${noCabe ? 'middle' : 'start'}" font-size="${fs(12.5)}" font-weight="700" fill="#1E3A8A" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke">${txt}</text>`;
+    }).join('');
 
     // Línea de la meta (80%) con etiqueta tipo píldora
     const yM = yp(CONFIG.meta);
@@ -485,6 +505,9 @@
   // ---------------------------------------------------------------------
   const ESPERA_LARGA = ['De 21 a 30 minutos', 'Más de 30 minutos'];
   const FRECUENTE = ['Algunas veces', 'Casi siempre', 'Siempre'];
+  // Cuántos casos analizados marcaron esta causa como secundaria (no como principal)
+  const vecesSecundaria = (casos, causa) => casos.filter((c) => c.secundarias.includes(causa)).length;
+
   function indicadores(regs) {
     const n = regs.length;
     const cal = regs.map((r) => r.calNum).filter((v) => typeof v === 'number');
@@ -529,26 +552,34 @@
       return ordenarConteo([...sec.entries()]);
     })();
 
+    // Sin casos como causa principal: los indicadores no aplican ("—" en vez de 0.0% falso)
+    const sinCasos = ind.n === 0;
+    const pctInd = (parte) => (sinCasos ? '—' : fmt1(pct(parte, ind.n)) + '%');
+    const cuentaInd = (parte) => (sinCasos ? '' : ` (${parte})`);
+    const nSec = vecesSecundaria(p.casos, causa);
+
     $('#dCuerpo').innerHTML = `
       <div class="mini-tarjetas">
-        ${mini(fila.n, `${plural(fila.n)} (causa principal)`)}
+        ${mini(fila.n, sinCasos ? `${plural(fila.n)} como causa principal` : `${plural(fila.n)} (causa principal)`)}
         ${mini(fmt1(fila.pct) + '%', `del total analizado (${p.total})`)}
+        ${sinCasos ? mini(nSec, `${nSec === 1 ? 'vez' : 'veces'} como causa secundaria`) : ''}
         ${mini(ind.calProm === null ? '—' : fmt1(ind.calProm) + '<small style="font-size:.9rem;color:var(--tinta-2)"> / 5</small>', 'calificación promedio')}
-        ${mini(fmt1(pct(ind.malas, ind.n)) + '%', `calificó “Mala” o “Muy mala” (${ind.malas})`)}
-        ${mini(fmt1(pct(ind.esperaLarga, ind.n)) + '%', `esperó más de 20 min (${ind.esperaLarga})`)}
-        ${mini(fmt1(pct(ind.frecuente, ind.n)) + '%', `tiene problemas “algunas veces” o más (${ind.frecuente})`)}
+        ${mini(pctInd(ind.malas), `calificó “Mala” o “Muy mala”${cuentaInd(ind.malas)}`)}
+        ${mini(pctInd(ind.esperaLarga), `esperó más de 20 min${cuentaInd(ind.esperaLarga)}`)}
+        ${mini(pctInd(ind.frecuente), `tiene problemas “algunas veces” o más${cuentaInd(ind.frecuente)}`)}
       </div>
+      ${sinCasos ? `<p class="nota" style="margin:-.5rem 0 1rem">Nadie la eligió como problema principal${filtro ? ' con este filtro' : ''}; aparece ${nSec} ${nSec === 1 ? 'vez' : 'veces'} como causa secundaria.</p>` : ''}
       <div class="detalle-grid">
         ${CONFIG.detalle.map((d) => `
           <div class="bloque">
             <h3>${esc(d.titulo)}</h3>
             ${d.multi ? '<p class="nota">Opción múltiple: puede sumar más de 100%</p>' : ''}
-            ${listaBarras(regs, d.campo, ind.n)}
+            ${sinCasos ? '<p class="nota">Sin casos.</p>' : listaBarras(regs, d.campo, ind.n)}
           </div>`).join('')}
         <div class="bloque">
           <h3>También marcaron (secundarias)</h3>
-          <p class="nota">${conSec} de ${ind.n} marcaron otro problema; no se suma al Pareto</p>
-          ${secTxt.length ? `<ul class="lista">${secTxt.map(([k, n]) => `
+          ${sinCasos ? '<p class="nota">Sin casos.</p>' : `<p class="nota">${conSec} de ${ind.n} marcaron otro problema; no se suma al Pareto</p>`}
+          ${sinCasos ? '' : secTxt.length ? `<ul class="lista">${secTxt.map(([k, n]) => `
             <li title="${esc(k)}"><span class="nombre">${esc(k)}</span><span class="valor">${n} · ${fmt1(pct(n, ind.n))}%</span>
             <span class="pista"><span class="relleno" style="width:${pct(n, ind.n)}%"></span></span></li>`).join('')}</ul>` : '<p class="nota">Ninguno.</p>'}
         </div>
@@ -601,7 +632,14 @@
     if (indTop.n) pistas.push(`<strong>${fmt1(pct(indTop.esperaLarga, indTop.n))}%</strong> esperó más de 20 minutos`);
     if (mejora) pistas.push(`lo que más piden mejorar es <strong>${esc(mejora.k.toLowerCase())}</strong> (${fmt1(pct(mejora.n, regsTop.length))}%)`);
     if (pistas.length) ps.push(`Dentro de la causa N.° 1, ${pistas.join('; ')}.`);
-    if (p.filas.length >= 4 && vitales.length / p.filas.length > 0.5)
+    // Causas con 0: se mencionan, pero nunca se recomienda atacarlas
+    p.filas.filter((f) => f.n === 0).forEach((f) => {
+      const nSec = vecesSecundaria(p.casos, f.causa);
+      ps.push(`«${esc(f.causa)}» no fue reportado como problema principal por nadie` +
+        (nSec ? ` (aparece ${nSec} ${nSec === 1 ? 'vez' : 'veces'} como secundario).` : ' (tampoco aparece como secundario).'));
+    });
+    const conCasos = p.filas.filter((f) => f.n > 0).length;
+    if (conCasos >= 4 && vitales.length / conCasos > 0.5)
       ps.push('Ojo: los problemas están bastante repartidos; aquí no se cumple tan claro la regla 80/20.');
     if (p.total < 10)
       ps.push(`⚠ Con solo ${p.total} ${plural(p.total)} las conclusiones son poco confiables; tómalas como pista, no como prueba.`);
