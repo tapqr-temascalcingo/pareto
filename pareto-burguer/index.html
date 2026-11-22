@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pareto · Problemas en el servicio de Restaurante Burguer</title>
+  <meta name="description" content="Diagrama de Pareto interactivo de los problemas reportados por clientes de Restaurante Burguer.">
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+  <header class="encabezado">
+    <div class="contenedor encabezado__fila">
+      <div>
+        <p class="eyebrow">Encuesta de calidad del servicio · Restaurante Burguer</p>
+        <h1>¿Qué problemas afectan más a nuestros clientes?</h1>
+        <p class="subtitulo">Diagrama de Pareto del <strong>principal problema</strong> reportado en la visita más reciente.</p>
+      </div>
+      <button id="btnProyector" class="btn btn--ghost" type="button" aria-pressed="false" title="Agranda textos para proyectar">
+        <span aria-hidden="true">🖥️</span> Modo proyector
+      </button>
+    </div>
+  </header>
+
+  <main class="contenedor">
+    <!-- FILTROS -->
+    <section class="panel filtros" aria-labelledby="tFiltros">
+      <div class="filtros__cabecera">
+        <h2 id="tFiltros">Filtros</h2>
+        <button id="btnLimpiar" class="btn btn--link" type="button" hidden>Quitar todos los filtros</button>
+      </div>
+      <div id="filtros" class="filtros__grid"></div>
+      <div id="estadoFiltro" class="estado-filtro" role="status" aria-live="polite"></div>
+    </section>
+
+    <!-- TARJETAS -->
+    <section id="tarjetas" class="tarjetas" aria-label="Resumen"></section>
+
+    <!-- GRÁFICA -->
+    <section class="panel" aria-labelledby="tGrafica">
+      <div class="panel__cabecera">
+        <div>
+          <h2 id="tGrafica">Diagrama de Pareto</h2>
+          <p class="nota">Haz clic (o toca) una barra para ver el detalle de esa causa. Cada causa conserva su color aunque cambies los filtros.</p>
+        </div>
+        <ul class="leyenda" aria-label="Leyenda">
+          <li><span class="sw sw--vital"></span>Color intenso = vital</li>
+          <li><span class="sw sw--resto"></span>Color pastel = trivial</li>
+          <li><span class="sw sw--zona"></span>Zona de causas vitales</li>
+          <li><span class="sw sw--linea"></span>% acumulado</li>
+          <li><span class="sw sw--meta"></span>Meta 80%</li>
+        </ul>
+      </div>
+      <div id="grafica" class="grafica"></div>
+      <div id="verificacion" class="verificacion"></div>
+    </section>
+
+    <!-- INTERPRETACIÓN -->
+    <section class="panel interpretacion" aria-labelledby="tInterp">
+      <h2 id="tInterp"><span aria-hidden="true">💡</span> ¿Qué nos dice?</h2>
+      <div id="interpretacion"></div>
+    </section>
+
+    <div class="dos-columnas">
+      <!-- TABLA -->
+      <section class="panel" aria-labelledby="tTabla">
+        <h2 id="tTabla">Datos del Pareto</h2>
+        <div class="tabla-scroll"><table id="tabla" class="tabla"></table></div>
+      </section>
+
+      <!-- SECUNDARIAS -->
+      <section class="panel" aria-labelledby="tSec">
+        <h2 id="tSec">Causas secundarias</h2>
+        <p class="nota">Problemas que se marcaron <em>además</em> del principal. Se muestran aparte y <strong>no se suman</strong> al Pareto.</p>
+        <div id="secundarias"></div>
+      </section>
+    </div>
+
+    <section class="panel metodo" aria-labelledby="tMetodo">
+      <h2 id="tMetodo">Cómo se calculó</h2>
+      <ul>
+        <li>Fuente: respuestas del formulario <em>Restaurante Burguer</em> (encuesta cerrada).</li>
+        <li>Se excluyen quienes contestaron <strong>“No experimenté ningún problema”</strong>.</li>
+        <li>La pregunta permitía marcar varias opciones. <strong>La primera opción marcada se toma como causa principal</strong> (cada persona cuenta una sola vez); las demás se reportan como causas secundarias.</li>
+        <li>En preguntas de detalle con varias opciones (día, horario, etapa, mejora) cada persona puede aparecer en más de una categoría, por lo que esos % pueden sumar más de 100%.</li>
+        <li>Si alguien marcó dos opciones en “tiempo de espera” o “frecuencia”, se tomó la más desfavorable.</li>
+        <li>Género, edad, ocupación, residencia y estudios eran texto libre y se agruparon en categorías.</li>
+        <li>Todos los números se calculan en el navegador a partir de los datos crudos y se redondean a 1 decimal.</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="contenedor pie">Hecho con HTML, CSS y JavaScript sin librerías externas · funciona sin internet.</footer>
+
+  <!-- DETALLE -->
+  <dialog id="detalle" class="detalle" aria-labelledby="dTitulo">
+    <div class="detalle__cabecera">
+      <div>
+        <p class="eyebrow" id="dEyebrow">Detalle de la causa</p>
+        <h2 id="dTitulo"></h2>
+      </div>
+      <button class="btn btn--icono" type="button" id="dCerrar" aria-label="Cerrar detalle">✕</button>
+    </div>
+    <div id="dCuerpo"></div>
+  </dialog>
+
+  <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+
+  <script src="js/datos.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
